@@ -1,0 +1,448 @@
+domain:
+   id: LABOR
+   name: 劳动纠纷
+   version: 1.1.0
+   description: "劳动合同、工资、社保、加班、辞退、工伤等劳动争议"
+
+factSchema:
+   # ── 劳动关系基础 ──
+   - key: hasWrittenContract
+     label: 是否签订书面劳动合同
+     type: BOOLEAN
+     required: true
+     askPrompt: "请问你和公司签订了书面的劳动合同吗？"
+     followUpIfTrue:
+        - key: contractStartDate
+          label: 合同开始日期
+          type: DATE
+          required: true
+          askPrompt: "合同是从什么时候开始的？"
+        - key: contractEndDate
+          label: 合同结束日期
+          type: DATE
+          required: false
+          askPrompt: "合同什么时候到期？（如果是无固定期限可以说一下）"
+        - key: probationPeriod
+          label: 试用期时长
+          type: ENUM
+          options: ["无试用期", "1个月", "2个月", "3个月", "6个月", "其他"]
+          required: false
+          askPrompt: "合同里约定的试用期是多久？"
+     followUpIfFalse:
+        - key: actualWorkStartDate
+          label: 实际开始工作日期
+          type: DATE
+          required: true
+          askPrompt: "虽然没有签合同，你实际是从什么时候开始上班的？"
+        - key: hasProofOfEmployment
+          label: 是否有其他劳动关系证明
+          type: BOOLEAN
+          required: true
+          askPrompt: "有没有工牌、考勤记录、工资流水、社保记录等能证明你在这工作的材料？"
+
+   # ── 用工形式（新增） ──
+   - key: employmentType
+     label: 用工形式
+     type: ENUM
+     options: ["全日制劳动合同", "非全日制（小时工）", "劳务派遣", "外包/众包", "实习", "兼职"]
+     required: false
+     askPrompt: "你的用工形式是哪种？比如正式员工、劳务派遣、外包、还是实习？"
+
+   # ── 薪资 ──
+   - key: salaryAmount
+     label: 月工资标准
+     type: MONEY
+     required: true
+     askPrompt: "你的月工资是多少？是税前还是税后？"
+   - key: salaryPaymentMethod
+     label: 工资发放形式
+     type: ENUM
+     options: ["银行转账", "微信转账", "支付宝转账", "现金", "部分银行+部分现金"]
+     required: true
+     askPrompt: "工资是通过什么方式发的？"
+   - key: salaryPaymentDay
+     label: 每月发薪日
+     type: STRING
+     required: false
+     askPrompt: "公司一般是每月几号发工资？"
+   - key: hasOvertimePay
+     label: 是否有加班费
+     type: BOOLEAN
+     required: false
+     askPrompt: "加班有没有额外付加班费？还是说是包干制/固定工资？"
+
+   # ── 社保与公积金 ──
+   - key: socialInsuranceStatus
+     label: 社保缴纳情况
+     type: ENUM
+     options: ["正常缴纳", "未缴纳", "试用期后才缴", "按最低基数缴", "只缴部分险种", "不清楚"]
+     required: false
+     askPrompt: "公司给你交社保的情况是怎样的？"
+   - key: housingFundStatus
+     label: 公积金缴纳情况
+     type: ENUM
+     options: ["正常缴纳", "未缴纳", "不清楚"]
+     required: false
+     askPrompt: "公积金有给你交吗？"
+
+   # ── 工时与加班 ──
+   - key: workingHours
+     label: 每日/每周工作时间
+     type: STRING
+     required: false
+     askPrompt: "你每天大概工作多长时间？每周上几天？"
+   - key: overtimeSituation
+     label: 加班情况
+     type: ENUM
+     options: ["从不加班", "偶尔加班（无加班费）", "经常加班（有调休）", "经常加班（无调休无加班费）", "周末/节假日加班"]
+     required: false
+     askPrompt: "你平时加班多吗？加班有调休或者加班费吗？"
+
+   # ── 离职/辞退 ──
+   - key: terminationType
+     label: 目前离职/在职状态
+     type: ENUM
+     options: ["仍在职", "主动辞职（已提/未提）", "被口头辞退", "收到书面辞退通知", "被裁员（经济性裁员）", "合同到期不续签", "被迫离职（公司欠薪/不交社保等）", "仍在职但感觉有风险"]
+     required: true
+     askPrompt: "你目前的情况是？"
+   - key: terminationDate
+     label: 离职/辞退日期
+     type: DATE
+     required: false
+     askPrompt: "是什么时候发生的？（口头/书面/实际最后工作日）"
+     applicableWhen: "terminationType != '仍在职' AND terminationType != '仍在职但感觉有风险'"
+   - key: terminationReason
+     label: 公司给出的辞退理由
+     type: STRING
+     required: false
+     askPrompt: "公司说为什么要辞退你？（比如业绩不达标、架构调整、试用期不合格等）"
+     applicableWhen: "terminationType IN ['被口头辞退', '收到书面辞退通知', '被裁员（经济性裁员）']"
+   - key: terminationNotice
+     label: 辞退提前通知情况
+     type: ENUM
+     options: ["当天让走人（无提前通知）", "提前3天", "提前30天", "提前通知但给了代通知金", "还在职中被通知"]
+     required: false
+     askPrompt: "公司提前多久通知你的？有没有给'代通知金'？"
+   - key: hasTerminationLetter
+     label: 是否有书面辞退证明
+     type: BOOLEAN
+     required: false
+     askPrompt: "有书面的辞退通知或者解除劳动合同证明吗？"
+     applicableWhen: "terminationType IN ['收到书面辞退通知', '被裁员（经济性裁员）']"
+
+   # ── 离职结算 ──
+   - key: finalSettlementStatus
+     label: 离职结算情况
+     type: ENUM
+     options: ["已全部结清", "工资未结清", "经济补偿金未付", "加班费未付", "年假未折算", "全部未结"]
+     required: false
+     askPrompt: "离职后工资和经济补偿金那边结算了吗？"
+     applicableWhen: "terminationType != '仍在职' AND terminationType != '仍在职但感觉有风险'"
+
+   # ── 工伤（可选） ──
+   - key: hasWorkInjury
+     label: 是否涉及工作中受伤
+     type: BOOLEAN
+     required: false
+     askPrompt: "你的情况中有没有在工作中受伤的情况？"
+
+   # ── 年假 ──
+   - key: annualLeaveStatus
+     label: 年假情况
+     type: STRING
+     required: false
+     askPrompt: "你入职以来年假休过吗？公司有没有安排过年假？"
+
+evidenceRules:
+   necessary:
+      - id: contract
+        name: 劳动合同
+        description: "证明劳动关系、薪资标准、合同期限的核心证据"
+        applicableWhen: "hasWrittenContract = true"
+      - id: id_card
+        name: 身份证复印件
+        description: "申请仲裁/投诉的身份证明"
+      - id: payroll_record
+        name: 工资流水或工资条
+        description: "证明工资标准、发放时间、是否欠薪"
+      - id: attendance_record
+        name: 考勤记录
+        description: "证明出勤情况、加班时长、是否在职"
+
+   enhancing:
+      - id: hr_chat
+        name: 与HR/老板的聊天记录
+        description: "证明辞退通知、欠薪沟通、调岗降薪等"
+        applicableWhen: "terminationType IN ['被口头辞退', '收到书面辞退通知', '被裁员（经济性裁员）', '被迫离职（公司欠薪/不交社保等）', '仍在职但感觉有风险']"
+      - id: termination_letter
+        name: 书面辞退通知/解除劳动合同证明
+        description: "证明公司单方解除的事实和理由"
+        applicableWhen: "hasTerminationLetter = true"
+      - id: work_email
+        name: 工作邮件往来
+        description: "证明工作内容、汇报关系、公司指令"
+      - id: witness_info
+        name: 同事证人证言及联系方式
+        description: "辅助证明劳动关系、加班情况、辞退事实"
+      - id: social_payment_record
+        name: 社保/公积金缴费记录
+        description: "证明劳动关系存续期、公司未缴/少缴情况"
+        applicableWhen: "socialInsuranceStatus != '正常缴纳' OR housingFundStatus != '正常缴纳'"
+      - id: medical_records
+        name: 工伤医疗记录
+        description: "证明工伤事实、伤情程度"
+        applicableWhen: "hasWorkInjury = true"
+      - id: tax_record
+        name: 个人所得税APP收入记录
+        description: "证明实际收入与申报收入是否一致"
+      - id: company_info
+        name: 公司工商信息（企查查/天眼查截图）
+        description: "仲裁时需要被申请人的准确名称、统一信用代码、注册地址"
+
+   earlyWarning:
+      - triggerKeywords: ["感觉要裁员", "公司效益不好", "老板暗示走人", "听说要优化"]
+        evidenceToCollect:
+           - "近期打卡记录截图（证明仍在正常出勤）"
+           - "工作成果记录（证明工作正常完成，排除'不胜任工作'借口）"
+           - "与HR/直属领导的沟通记录（任何涉及岗位变动、薪资变动、人员优化的对话）"
+           - "工资条/银行流水（证明薪资标准，为后续赔偿计算留底）"
+           - "劳动合同原件或照片（确认合同条款）"
+        warningText: "你描述的情况可能涉及违法调岗降薪或违法解除劳动合同风险。建议立即开始收集以下证据，以防后续维权需要："
+      - triggerKeywords: ["调岗", "降薪", "变更工作地点"]
+        evidenceToCollect:
+           - "调岗/降薪通知书（书面或聊天记录）"
+           - "原岗位工作内容与原薪资证明"
+           - "新岗位描述与新薪资标准"
+           - "与上级/HR沟通调岗降薪原因的聊天记录"
+        warningText: "调岗降薪需要双方协商一致并书面确认。如果公司单方面强制调岗降薪，你有权拒绝。建议收集以下证据："
+      - triggerKeywords: ["没交社保", "社保没交", "公积金没交"]
+        evidenceToCollect:
+           - "社保缴费记录截图（支付宝/微信社保查询）"
+           - "工资条（证明工资标准，用于计算社保应缴基数）"
+           - "劳动合同（证明劳动关系）"
+        warningText: "用人单位必须为员工缴纳社会保险，试用期也不例外。你可以向社保稽核部门投诉。建议先收集以下证据："
+
+# ── 新增：证据充分度评估维度 ──
+evidenceEvaluation:
+   dimensions:
+      - key: employment_relationship
+        label: "劳动关系证明"
+        description: "是否有劳动合同、工资流水、社保记录等证明劳动关系存在"
+      - key: infringement_fact
+        label: "侵权事实证据"
+        description: "是否有辞退通知、欠薪记录、加班记录等证明公司存在违法行为"
+      - key: damage_amount
+        label: "损失/金额证据"
+        description: "是否有工资条、银行流水、赔偿金计算依据等证明具体金额"
+      - key: procedure_compliance
+        label: "程序合规性"
+        description: "是否在仲裁时效内、是否履行了前置程序（如被迫离职的通知）"
+      - key: counterparty_defense
+        label: "对方可能抗辩及我方反驳证据"
+        description: "公司可能提出的抗辩理由（如试用期不合格、严重违纪）及我方是否有证据反驳"
+
+# ── 新增：执行风险提醒 ──
+riskReminder:
+   triggerCondition: "case involves monetary claim (unpaid wages, compensation, overtime pay, etc.)"
+   content: |
+      ⚠️ **执行风险提示**：即使仲裁或法院判决你胜诉，如果公司没有可供执行的财产（如账户没钱、已转移资产、进入破产程序），你可能面临"执行不能"的情况，即判决书无法实际兑现。建议：
+      1. 在仲裁/诉讼前，通过企查查/天眼查了解公司工商状态和涉诉情况
+      2. 如有必要，可在诉前或诉中申请财产保全
+      3. 如果公司仍在经营但有转移资产迹象，可向法院申请行为保全
+      4. 仲裁/诉讼期间，关注公司是否注销或变更法定代表人
+
+# ── 新增：多方案对比模板 ──
+solutionTemplates:
+   triggerConditions:
+      - "core facts completion >= 80%"
+      - "user asks '我该怎么办' / '我能要多少钱' / '怎么维权'"
+      - "agent judges facts are sufficient"
+   solutions:
+      - id: negotiation
+        name: "方案A：协商和解"
+        path: "直接与公司沟通协商"
+        timeEstimate: "1-2周"
+        cost: "0元"
+        amountEstimate: "可能低于法定标准（取决于谈判能力）"
+        successEvaluation: "取决于公司态度和谈判技巧"
+        risks:
+           - "公司可能拖延或反悔"
+           - "金额可能低于法定标准"
+           - "无强制力，对方不履行无法强制执行"
+        pros:
+           - "最快、成本最低"
+           - "关系不彻底破裂"
+        cons:
+           - "金额可能打折"
+           - "无法律强制保障"
+        applicableWhen: "terminationType != '仍在职' AND finalSettlementStatus != '已全部结清'"
+
+      - id: labor_complaint
+        name: "方案B：劳动监察投诉"
+        path: "向当地劳动保障监察大队投诉"
+        timeEstimate: "1-3个月"
+        cost: "0元"
+        amountEstimate: "仅限特定诉求（欠薪、社保补缴、加班费）"
+        successEvaluation: "中高（行政机关有执法权）"
+        risks:
+           - "不处理赔偿金争议（如违法解除赔偿金）"
+           - "公司可能不配合调查"
+        pros:
+           - "免费、处理速度相对快"
+           - "行政机关可强制处罚"
+        cons:
+           - "只能处理特定类型违法（欠薪、社保、超时加班）"
+           - "不能裁决赔偿金"
+        applicableWhen: "socialInsuranceStatus != '正常缴纳' OR finalSettlementStatus IN ['工资未结清', '全部未结']"
+
+      - id: arbitration
+        name: "方案C：劳动仲裁"
+        path: "向劳动争议仲裁委员会申请仲裁"
+        timeEstimate: "3-6个月（含一裁）"
+        cost: "0元（仲裁免费）"
+        amountEstimate: "法定全额（工资、赔偿金、加班费等）"
+        successEvaluation: "高（证据充分时）"
+        risks:
+           - "公司可能起诉拖延（一审+二审）"
+           - "胜诉后执行风险（公司无财产）"
+           - "举证责任：部分证据由公司掌握（如考勤），公司不提供可能承担不利后果"
+        pros:
+           - "免费、裁决有强制执行力"
+           - "可处理全部劳动争议"
+           - "举证责任倒置对劳动者有利"
+        cons:
+           - "耗时长（3-6个月起步）"
+           - "公司可能恶意拖延"
+        applicableWhen: "terminationType != '仍在职' OR finalSettlementStatus != '已全部结清'"
+
+      - id: litigation
+        name: "方案D：法院诉讼"
+        path: "对仲裁裁决不服向法院起诉"
+        timeEstimate: "6-12个月+"
+        cost: "诉讼费（可申请减免）"
+        amountEstimate: "法定全额"
+        successEvaluation: "高"
+        risks:
+           - "时间成本极高"
+           - "执行风险"
+        pros:
+           - "终审判决有最终强制力"
+        cons:
+           - "耗时最长、精力消耗大"
+        applicableWhen: "arbitration completed and dissatisfied with result"
+
+   recommendationLogic: |
+      根据当前案情：
+      1. 如果证据充分且金额较大 → 推荐方案C（仲裁）为主，方案A（协商）为辅
+      2. 如果仅涉及欠薪/社保 → 推荐方案B（监察投诉）快速解决
+      3. 如果公司明显有转移资产迹象 → 方案C + 财产保全
+      4. 如果仍在职不想闹僵 → 方案A 优先，同时默默收集证据
+
+lawMapping:
+   illegal_termination:
+      - law: "中华人民共和国劳动合同法"
+        articles: ["第39条", "第40条", "第41条", "第47条", "第48条", "第87条"]
+   unpaid_wages:
+      - law: "中华人民共和国劳动合同法"
+        articles: ["第30条", "第38条", "第46条", "第47条", "第85条"]
+      - law: "中华人民共和国劳动法"
+        articles: ["第50条"]
+   no_contract:
+      - law: "中华人民共和国劳动合同法"
+        articles: ["第10条", "第14条", "第82条"]
+      - law: "中华人民共和国劳动合同法实施条例"
+        articles: ["第6条", "第7条"]
+   social_insurance:
+      - law: "中华人民共和国社会保险法"
+        articles: ["第58条", "第60条", "第63条", "第86条"]
+   overtime_pay:
+      - law: "中华人民共和国劳动法"
+        articles: ["第41条", "第44条"]
+   work_injury:
+      - law: "工伤保险条例"
+        articles: ["第14条", "第15条", "第17条", "第21条", "第30条", "第33条", "第35条", "第36条", "第37条"]
+   forced_resignation:
+      - law: "中华人民共和国劳动合同法"
+        articles: ["第38条", "第46条", "第47条"]
+   economic_layoff:
+      - law: "中华人民共和国劳动合同法"
+        articles: ["第41条", "第46条", "第47条"]
+   contract_expiry:
+      - law: "中华人民共和国劳动合同法"
+        articles: ["第44条", "第46条", "第47条"]
+
+processTemplate:
+   steps:
+      - id: negotiation
+        name: "协商"
+        description: "与用人单位直接沟通，尝试协商解决争议"
+        requiredDocs: []
+        deadlineRule: null
+        tips: "协商过程建议录音或保留聊天记录，可作为后续证据。"
+      - id: complaint_labor
+        name: "劳动监察投诉"
+        description: "向当地劳动保障监察大队投诉用人单位违法行为"
+        requiredDocs: ["身份证原件及复印件", "劳动合同（如有）", "工资流水", "考勤记录", "投诉书"]
+        deadlineRule: "违法行为发生之日起2年内"
+        tips: "劳动监察大队有权责令公司改正并处罚款，处理速度通常比仲裁快。"
+      - id: mediation
+        name: "调解"
+        description: "通过企业劳动争议调解委员会或基层调解组织调解"
+        requiredDocs: ["调解申请书", "身份证明", "证据材料"]
+        deadlineRule: null
+        tips: "调解协议可申请法院司法确认，具有强制执行力。"
+      - id: arbitration
+        name: "劳动仲裁"
+        description: "向劳动合同履行地或用人单位所在地的劳动争议仲裁委员会申请仲裁"
+        requiredDocs: ["仲裁申请书（正本1份+副本按被申请人数量）", "身份证复印件", "被申请人企业工商信息", "证据清单及证据材料"]
+        deadlineRule: "知道或应当知道权利被侵害之日起1年内"
+        tips: "仲裁委不收费。证据复印件一般按'被申请人数+1'份准备。"
+      - id: litigation
+        name: "法院诉讼（一审）"
+        description: "对劳动仲裁裁决不服的，向人民法院提起诉讼"
+        requiredDocs: ["起诉状", "仲裁裁决书", "身份证明", "证据材料"]
+        deadlineRule: "收到仲裁裁决书之日起15日内"
+        tips: "终局裁决用人单位不能起诉，但可申请撤销。"
+      - id: litigation_2nd
+        name: "法院诉讼（二审）"
+        description: "对一审判决不服的，向上一级人民法院提起上诉"
+        requiredDocs: ["上诉状", "一审判决书", "新证据（如有）"]
+        deadlineRule: "收到一审判决书之日起15日内"
+        tips: "二审终审。"
+
+   evidenceCopyNote: "劳动仲裁一般要求：证据原件1份（开庭时核对）+ 复印件按'被申请人数量+1'份提交仲裁委。具体份数以当地仲裁委通知为准。"
+
+docTemplates:
+   - id: arbitration_application
+     name: "劳动仲裁申请书"
+     fields:
+        - label: "申请人信息"
+          placeholder: "姓名、性别、出生日期、民族、身份证号、住址、联系电话"
+        - label: "被申请人信息"
+          placeholder: "公司全称、统一社会信用代码、住所地、法定代表人姓名及职务、联系电话"
+        - label: "仲裁请求"
+          placeholder: "1. 请求裁决被申请人支付违法解除劳动合同赔偿金XX元；\n2. 请求裁决被申请人支付拖欠工资XX元；..."
+        - label: "事实与理由"
+          placeholder: "申请人于X年X月X日入职，担任XX岗位，月工资XX元。X年X月X日，被申请人无正当理由口头辞退申请人..."
+
+   - id: evidence_list
+     name: "证据清单"
+     fields:
+        - label: "序号"
+          placeholder: "1"
+        - label: "证据名称"
+          placeholder: "劳动合同"
+        - label: "证明目的"
+          placeholder: "证明申请人与被申请人之间存在劳动关系，合同期限、薪资标准"
+        - label: "原件/复印件"
+          placeholder: "复印件（原件开庭时出示）"
+
+   - id: hearing_preparation
+     name: "开庭前准备清单"
+     fields:
+        - label: "材料准备"
+          placeholder: "必带原件：身份证、证据原件。复印件X份。笔和笔记本。"
+        - label: "陈述要点"
+          placeholder: "1. 入职时间、岗位、薪资；2. 辞退经过；3. 赔偿计算依据"
+        - label: "对方可能抗辩及应对"
+          placeholder: "对方可能说：试用期不合格/严重违纪。应对：要求对方出示证据。"
