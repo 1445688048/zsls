@@ -1,0 +1,57 @@
+<view class="container">
+  <view class="header">
+    <view class="title">案件时间轴</view>
+    <button class="add-btn" bindtap="onAddEvent">+ 添加事件</button>
+  </view>
+
+  <view class="timeline" wx:if="{{!loading}}">
+    <view wx:if="{{events.length === 0}}" class="empty">暂无事件，点击添加</view>
+    <view wx:for="{{events}}" wx:key="eventId" class="timeline-item {{item.isDeadline ? 'deadline' : ''}}">
+      <view class="dot"></view>
+      <view class="timeline-content">
+        <view class="event-time">{{item.eventTime}}</view>
+        <view class="event-desc">{{item.description}}</view>
+        <view class="event-meta">
+          <text class="event-type">{{item.type}}</text>
+          <text wx:if="{{item.isDeadline}}" class="deadline-badge">截止日</text>
+        </view>
+        <view wx:if="{{item.reminderText}}" class="reminder">⏰ {{item.reminderText}}</view>
+        <view class="event-actions">
+          <text class="delete-btn" data-event-id="{{item.eventId}}" bindtap="onDeleteEvent">删除</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading">加载中...</view>
+
+  <!-- 添加事件弹窗 -->
+  <view wx:if="{{showAddModal}}" class="modal" bindtap="onCloseModal">
+    <view class="modal-content" catchtap="">
+      <view class="modal-title">添加时间轴事件</view>
+      <view class="form-group">
+        <view class="label">日期时间</view>
+        <input class="input" type="digit" value="{{newEvent.eventTime}}" bindinput="onInput" data-field="eventTime" placeholder="2024-03-01 09:00"/>
+      </view>
+      <view class="form-group">
+        <view class="label">事件描述</view>
+        <textarea class="textarea" value="{{newEvent.description}}" bindinput="onInput" data-field="description" placeholder="描述该事件"/>
+      </view>
+      <view class="form-group">
+        <view class="label">类型</view>
+        <radio-group bindchange="onTypeChange">
+          <label><radio value="USER_ACTION" checked="{{newEvent.type === 'USER_ACTION'}}"/> 用户操作</label>
+          <label><radio value="SYSTEM_DEADLINE" checked="{{newEvent.type === 'SYSTEM_DEADLINE'}}"/> 系统截止日</label>
+          <label><radio value="COMPANY_ACTION" checked="{{newEvent.type === 'COMPANY_ACTION'}}"/> 公司行为</label>
+        </radio-group>
+      </view>
+      <view class="form-group">
+        <label><checkbox checked="{{newEvent.isDeadline}}" bindchange="onDeadlineToggle"/> 设为截止日（红色显示）</label>
+      </view>
+      <view class="modal-actions">
+        <button class="btn-cancel" bindtap="onCloseModal">取消</button>
+        <button class="btn-save" bindtap="onSaveEvent">保存</button>
+      </view>
+    </view>
+  </view>
+</view>

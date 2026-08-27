@@ -1,0 +1,23 @@
+.container { display: flex; flex-direction: column; height: 100vh; background: #f5f6fa; }
+.header { background: #1a5276; color: #fff; padding: 20rpx 24rpx; display: flex; align-items: center; }
+.back-btn { font-size: 28rpx; margin-right: 20rpx; }
+.case-title { font-size: 32rpx; font-weight: bold; flex: 1; }
+.messages { flex: 1; height: 0; padding: 24rpx; box-sizing: border-box; }
+.cursor { color: #1a5276; animation: blink 0.8s infinite; margin-left: 2rpx; }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+.message { margin-bottom: 20rpx; display: flex; }
+.message-user { justify-content: flex-end; }
+.message-assistant { justify-content: flex-start; }
+.bubble { max-width: 80%; padding: 20rpx 24rpx; border-radius: 16rpx; font-size: 28rpx; line-height: 1.6; }
+.message-user .bubble { background: #1a5276; color: #fff; border-radius: 16rpx 16rpx 4rpx 16rpx; }
+.message-assistant .bubble { background: #fff; color: #333; border-radius: 16rpx 16rpx 16rpx 4rpx; box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.06); }
+.typing { display: flex; gap: 8rpx; padding: 24rpx; }
+.dot { width: 12rpx; height: 12rpx; background: #999; border-radius: 50%; animation: bounce 1.2s infinite; }
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-8rpx); } }
+.input-bar { display: flex; align-items: center; padding: 16rpx 24rpx; background: #fff; border-top: 1rpx solid #eee; }
+.voice-btn { font-size: 40rpx; margin-right: 16rpx; }
+.text-input { flex: 1; font-size: 28rpx; padding: 12rpx 16rpx; background: #f5f6fa; border-radius: 24rpx; }
+.send-btn { font-size: 28rpx; color: #ccc; margin-left: 16rpx; padding: 12rpx 20rpx; }
+.send-active { color: #1a5276; font-weight: bold; }

@@ -1,0 +1,73 @@
+<view class="container">
+  <!-- 案件头部 -->
+  <view class="case-header" wx:if="{{caseInfo}}">
+    <view class="case-title">{{caseInfo.title || caseInfo.domainType}}</view>
+    <view class="case-meta">
+      <text class="domain-tag">{{caseInfo.domainType}}</text>
+      <text class="status-tag status-{{caseInfo.status}}">{{caseInfo.status === 'COLLECTING' ? '采集中' : caseInfo.status === 'ANALYZING' ? '分析中' : '就绪'}}</text>
+    </view>
+  </view>
+
+  <!-- 无案件空态 -->
+  <view wx:if="{{!caseInfo && !loading}}" class="tab-content">
+    <view class="empty">暂无案件，请先创建案件</view>
+    <button class="btn-chat" bindtap="onGoCreate">去创建案件</button>
+  </view>
+
+  <!-- Tab 切换 -->
+  <view class="tab-bar" wx:if="{{caseInfo}}">
+    <scroll-view scroll-x class="tab-scroll">
+      <view class="tab-list">
+        <view 
+          wx:for="{{tabs}}" wx:key="key"
+          class="tab-item {{activeTab === item.key ? 'active' : ''}}"
+          data-tab="{{item.key}}"
+          bindtap="onTabChange"
+        >{{item.name}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 对话 Tab -->
+  <view wx:if="{{activeTab === 'chat'}}" class="tab-content">
+    <view class="chat-hint">开始对话，AI 将帮您梳理案情</view>
+    <button class="btn-chat" bindtap="onNavigate" data-tab="chat">开始对话</button>
+  </view>
+
+  <!-- 事实要素 Tab -->
+  <view wx:if="{{activeTab === 'facts'}}" class="tab-content">
+    <view class="fact-item" wx:for="{{facts}}" wx:key="key">
+      <view class="fact-label">{{item.label}}</view>
+      <view class="fact-value {{item.confidence === 'LOW' ? 'fact-low' : ''}}">
+        {{item.value || '待补充'}}
+      </view>
+    </view>
+    <view wx:if="{{facts.length === 0}}" class="empty">暂无事实信息，请通过对话补充</view>
+  </view>
+
+  <!-- 证据 Tab -->
+  <view wx:if="{{activeTab === 'evidence'}}" class="tab-content">
+    <view class="evidence-hint">前往证据管理页收集和上传证据</view>
+    <button class="btn-evidence" bindtap="onNavigate" data-tab="evidence">管理证据</button>
+  </view>
+
+  <!-- 法律意见 Tab -->
+  <view wx:if="{{activeTab === 'law'}}" class="tab-content">
+    <view wx:if="{{laws.length === 0}}" class="law-hint">暂无引用法条，请先与 AI 对话</view>
+    <view wx:for="{{laws}}" wx:key="index" class="law-item">
+      <view class="law-title">{{item.lawTitle}} {{item.article}}</view>
+      <view class="law-content">{{item.content}}</view>
+    </view>
+    <view class="disclaimer">⚠️ 本结果由 AI 生成，仅供参考，不构成法律意见</view>
+    <button class="btn-chat" bindtap="onNavigate" data-tab="export">导出法律意见书 PDF</button>
+  </view>
+
+  <!-- 时间轴 Tab -->
+  <view wx:if="{{activeTab === 'timeline'}}" class="tab-content">
+    <view class="timeline-hint">前往时间轴页管理事件</view>
+    <button class="btn-timeline" bindtap="onNavigate" data-tab="timeline">查看时间轴</button>
+  </view>
+
+  <!-- 刷新按钮 -->
+  <view class="refresh-btn" bindtap="onRefresh">↻ 刷新</view>
+</view>

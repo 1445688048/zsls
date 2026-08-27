@@ -1,0 +1,51 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/chat/chat",
+    "pages/case/detail/detail",
+    "pages/case/create/create",
+    "pages/case/timeline/timeline",
+    "pages/case/evidence/evidence",
+    "pages/export/export",
+    "pages/disclaimer/disclaimer"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#1a5276",
+    "navigationBarTitleText": "掌上律师",
+    "navigationBarTextStyle": "white"
+  },
+  "tabBar": {
+    "color": "#7A7E83",
+    "selectedColor": "#1a5276",
+    "borderStyle": "black",
+    "backgroundColor": "#ffffff",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "iconPath": "assets/icons/home.png",
+        "selectedIconPath": "assets/icons/home-active.png",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/case/detail/detail",
+        "iconPath": "assets/icons/case.png",
+        "selectedIconPath": "assets/icons/case-active.png",
+        "text": "我的案件"
+      }
+    ]
+  },
+  "permission": {
+    "scope.record": {
+      "desc": "用于语音输入法律咨询问题，录音仅在识别时使用，不对外上传"
+    }
+  },
+  "plugins": {
+    "WechatSI": {
+      "version": "0.3.5",
+      "provider": "wx069ba97219f66d99"
+    }
+  },
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

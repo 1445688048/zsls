@@ -1,0 +1,52 @@
+<view class="container">
+  <view class="header">
+    <view class="back-btn" bindtap="onNavigateBack">← 返回</view>
+    <view class="title">新建案件</view>
+  </view>
+  
+  <view class="section">
+    <view class="section-title">选择案件类型</view>
+    <view class="domain-grid">
+      <view 
+        wx:for="{{domainTypes}}" 
+        wx:key="id"
+        class="domain-card {{selectedDomain === item.id ? 'selected' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onDomainSelect"
+      >
+        <view class="domain-icon">{{item.icon}}</view>
+        <view class="domain-name">{{item.name}}</view>
+        <view class="domain-desc">{{item.description}}</view>
+        <view wx:if="{{selectedDomain === item.id}}" class="selected-check">✓</view>
+      </view>
+    </view>
+  </view>
+  
+  <view class="section">
+    <view class="section-title">案件标题</view>
+    <input 
+      class="input" 
+      placeholder="请输入案件标题（如：被公司辞退索赔）" 
+      value="{{title}}"
+      bindinput="onTitleInput"
+      maxlength="50"
+    />
+  </view>
+  
+  <view class="section">
+    <view class="section-title">案件描述（可选）</view>
+    <textarea 
+      class="textarea" 
+      value="{{description}}"
+      bindinput="onDescriptionInput"
+      placeholder="简要描述您的情况，有助于 AI 更好理解..."
+      maxlength="500"
+    ></textarea>
+  </view>
+  
+  <button class="btn-create" bindtap="onSubmit" loading="{{submitting}}">
+    创建案件
+  </button>
+  
+  <view class="tip">创建后将开始 AI 对话，帮您梳理案情、收集证据</view>
+</view>

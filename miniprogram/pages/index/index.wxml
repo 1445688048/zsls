@@ -1,0 +1,44 @@
+<view class="container">
+  <!-- 领域选择 -->
+  <view class="section">
+    <view class="section-title">选择案件类型</view>
+    <view class="domain-grid">
+      <view 
+        wx:for="{{domainTypes}}" 
+        wx:key="id"
+        class="domain-card {{item.enabled ? 'enabled' : 'disabled'}}"
+        data-id="{{item.id}}"
+        bindtap="onDomainSelect"
+      >
+        <view class="domain-icon">{{item.icon}}</view>
+        <view class="domain-name">{{item.name}}</view>
+        <view class="domain-desc">{{item.enabled ? item.description : item.reason}}</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 我的案件 -->
+  <view class="section">
+    <view class="section-header">
+      <view class="section-title">我的案件</view>
+      <view class="add-btn" bindtap="onAddCase">+ 新建</view>
+    </view>
+    <view wx:if="{{loading}}" class="loading">加载中...</view>
+    <view wx:if="{{!loading && cases.length === 0}}" class="empty-hint">暂无案件，点击上方创建</view>
+    <view wx:for="{{cases}}" wx:key="case_id" class="case-card" data-case-id="{{item.case_id}}" bindtap="onGoToCase">
+      <view class="case-title">{{item.title || item.domainType}}</view>
+      <view class="case-meta">
+        <text class="case-domain">{{item.domainType}}</text>
+        <text class="case-status status-{{item.status}}">{{item.status === 'COLLECTING' ? '采集中' : item.status === 'ANALYZING' ? '分析中' : item.status === 'READY' ? '可导出' : item.status}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 快速提示 -->
+  <view class="tips">
+    <view class="tip-title">使用提示</view>
+    <view class="tip-item">• 创建案件后，AI 将引导您梳理案情</view>
+    <view class="tip-item">• 对话内容将发送至 AI 服务商进行分析</view>
+    <view class="tip-item">• 上传的证据保存在您的账号档案中，可随时删除</view>
+  </view>
+</view>

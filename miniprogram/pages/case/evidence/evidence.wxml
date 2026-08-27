@@ -1,0 +1,39 @@
+<view class="container">
+  <view class="section">
+    <view class="section-title">必要证据</view>
+    <view class="evidence-item" wx:for="{{necessary}}" wx:key="id" data-id="{{item.id}}" bindtap="onCollectEvidence">
+      <view class="evidence-info">
+        <view class="evidence-name">{{item.name}}</view>
+        <view class="evidence-desc">{{item.description}}</view>
+      </view>
+      <view class="evidence-status {{item.collected ? 'collected' : 'pending'}}">{{item.collected ? '✓ 已收集' : '待收集'}}</view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">增强证据</view>
+    <view class="evidence-item" wx:for="{{enhancing}}" wx:key="id" data-id="{{item.id}}" bindtap="onCollectEvidence">
+      <view class="evidence-info">
+        <view class="evidence-name">{{item.name}}</view>
+        <view class="evidence-desc">{{item.description}}</view>
+      </view>
+      <view class="evidence-status {{item.collected ? 'collected' : 'pending'}}">{{item.collected ? '✓ 已收集' : '待收集'}}</view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">已保存证据</view>
+    <view wx:if="{{evidenceList.length === 0}}" class="empty">暂无已保存证据</view>
+    <view class="evidence-grid">
+      <view wx:for="{{evidenceList}}" wx:key="refId" class="evidence-card" data-path="{{item.url}}" bindtap="onPreviewImage">
+        <image class="evidence-img" src="{{item.url}}" mode="aspectFill"/>
+        <view class="evidence-delete" data-index="{{index}}" catchtap="onDeleteEvidence">✕</view>
+      </view>
+      <view class="evidence-add" bindtap="onChooseMedia">
+        <view class="add-icon">+</view>
+        <view class="add-text">添加证据</view>
+      </view>
+    </view>
+    <view class="tip">证据上传后保存至您账号的案件档案中，可随时回看与删除</view>
+  </view>
+</view>

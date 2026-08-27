@@ -1,0 +1,23 @@
+<view class="container">
+  <view class="header">
+    <view class="back-btn" bindtap="onNavigateToCase">← 返回案件</view>
+    <view class="case-title">{{caseTitle}}</view>
+  </view>
+  <scroll-view class="messages" scroll-y scroll-with-animation scroll-into-view="{{scrollInto}}">
+    <view wx:for="{{messages}}" wx:key="index" id="msg-{{index}}" class="message {{item.role === 'user' ? 'message-user' : 'message-assistant'}}">
+      <view class="bubble">
+        {{item.content}}<text wx:if="{{item.streaming}}" class="cursor">▌</text>
+      </view>
+    </view>
+    <view wx:if="{{isStreaming && messages.length === 0}}" class="message message-assistant">
+      <view class="bubble typing">
+        <text class="dot"></text><text class="dot"></text><text class="dot"></text>
+      </view>
+    </view>
+  </scroll-view>
+  <view class="input-bar">
+    <view class="voice-btn" bindtap="onVoiceInput">🎤</view>
+    <input class="text-input" value="{{inputText}}" bindinput="onInput" placeholder="输入消息..." confirm-type="send"/>
+    <view class="send-btn {{canSend ? 'send-active' : ''}}" bindtap="onSend">发送</view>
+  </view>
+</view>

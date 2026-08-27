@@ -1,0 +1,35 @@
+<view class="container">
+  <view class="case-info">
+    <view class="title">{{caseTitle || '案件'}}</view>
+    <view class="subtitle">法律意见书导出</view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">导出选项</view>
+    
+    <view class="option-card" bindtap="onPreviewOriginal">
+      <view class="option-icon">📄</view>
+      <view class="option-content">
+        <view class="option-name">原文查看</view>
+        <view class="option-desc">包含完整案件信息，含敏感数据</view>
+      </view>
+      <view class="option-arrow">›</view>
+    </view>
+
+    <view class="option-card" bindtap="onPreviewRedacted">
+      <view class="option-icon">🔒</view>
+      <view class="option-content">
+        <view class="option-name">脱敏查看</view>
+        <view class="option-desc">替换姓名、身份证、手机号等敏感信息</view>
+      </view>
+      <view class="option-arrow">›</view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">导出说明</view>
+    <view class="tip">• 导出后可在小程序内直接预览，也可转发保存</view>
+    <view class="tip">• 脱敏版本将自动替换手机号、身份证等敏感信息</view>
+    <view class="tip">• 导出文件可用于劳动仲裁、诉讼等场景</view>
+  </view>
+</view>
