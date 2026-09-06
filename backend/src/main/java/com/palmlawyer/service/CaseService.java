@@ -2,6 +2,7 @@
 // 案件服务层，封装案件 CRUD 业务逻辑
 package com.palmlawyer.service;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.palmlawyer.entity.CaseProfile;
 import com.palmlawyer.mapper.CaseProfileMapper;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,10 @@ import java.util.Map;
  */
 @Service
 public class CaseService {
+
+    /** LambdaUpdateWrapper 更新 JSON 列时需显式指定 TypeHandler */
+    private static final String JSON_TYPE_HANDLER =
+            "typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler";
 
     private final CaseProfileMapper mapper;
 
@@ -81,10 +86,13 @@ public class CaseService {
     }
 
     /**
-     * 更新案件字段
+     * 更新案件字段（白名单制，且只更新出现的列）
      *
-     * @param caseId    案件 ID
-     * @param updates   待更新的字段 Map
+     * <p>status 由状态机（CaseStatusService）管理、evidenceRefs/lawsJson 由系统流程回写，
+     * 均不接受客户端直接修改，避免绕过状态机或覆盖系统数据。
+     *
+     * @param caseId  案件 ID
+     * @param updates 待更新的字段 Map
      * @return 更新后的案件对象
      */
     public CaseProfile update(Long caseId, Map<String, Object> updates) {
@@ -92,15 +100,27 @@ public class CaseService {
         if (c == null) {
             throw new IllegalArgumentException("案件不存在: " + caseId);
         }
-        if (updates.containsKey("factsJson")) c.setFactsJson((Map) updates.get("factsJson"));
-        if (updates.containsKey("status")) c.setStatus((String) updates.get("status"));
-        if (updates.containsKey("title")) c.setTitle((String) updates.get("title"));
-        if (updates.containsKey("domainType")) c.setDomainType((String) updates.get("domainType"));
-        if (updates.containsKey("issuesJson")) c.setIssuesJson((List) updates.get("issuesJson"));
-        if (updates.containsKey("lawsJson")) c.setLawsJson((List) updates.get("lawsJson"));
-        if (updates.containsKey("evidenceRefs")) c.setEvidenceRefs((List) updates.get("evidenceRefs"));
-        c.setUpdatedAt(LocalDateTime.now());
-        mapper.updateById(c);
-        return c;
+        LambdaUpdateWrapper<CaseProfile> uw = new LambdaUpdateWrapper<CaseProfile>()
+                .eq(CaseProfile::getCaseId, caseId);
+        boolean changed = false;
+        if (updates.containsKey("title")) {
+            Object title = updates.get("title");
+            uw.set(CaseProfile::getTitle, title == null ? null : String.valueOf(title));
+            changed = true;
+        }
+        if (updates.containsKey("factsJson") && updates.get("factsJson") instanceof Map) {
+            uw.set(CaseProfile::getFactsJson, updates.get("factsJson"), JSON_TYPE_HANDLER);
+            changed = true;
+        }
+        if (updates.containsKey("issuesJson") && updates.get("issuesJson") instanceof List) {
+            uw.set(CaseProfile::getIssuesJson, updates.get("issuesJson"), JSON_TYPE_HANDLER);
+            changed = true;
+        }
+        if (!changed) {
+            return c;
+        }
+        uw.set(CaseProfile::getUpdatedAt, LocalDateTime.now());
+        mapper.update(null, uw);
+        return mapper.selectById(caseId);
     }
 }

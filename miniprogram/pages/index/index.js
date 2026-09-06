@@ -63,7 +63,7 @@ Page({
 
   onGoToCase(e) {
     const { caseId } = e.currentTarget.dataset;
-    const item = this.data.cases.find((c) => String(c.case_id) === String(caseId));
+    const item = this.data.cases.find((c) => String(c.caseId) === String(caseId));
     goToCase({ caseId, title: item && item.title, domainType: item && item.domainType });
   },
 

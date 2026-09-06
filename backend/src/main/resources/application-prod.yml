@@ -2,7 +2,9 @@
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/palm_lawyer
+    # stringtype=unspecified：实体经 JacksonTypeHandler 写 JSONB 列时按 varchar 绑定，
+    # 缺该参数 PG 会报 "column ... is of type jsonb but expression is of type character varying"
+    url: jdbc:postgresql://localhost:5432/palm_lawyer?stringtype=unspecified
     username: ${POSTGRES_USER:palm_lawyer}
     password: ${POSTGRES_PASSWORD:}
     driver-class-name: org.postgresql.Driver

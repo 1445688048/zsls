@@ -6,7 +6,6 @@ import com.palmlawyer.util.AuthContext;
 import com.palmlawyer.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
@@ -16,8 +15,11 @@ import org.springframework.web.servlet.HandlerInterceptor;
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
 
-    @Value("${palmlawyer.security.jwt.secret}")
-    private String jwtSecret;
+    private final JwtSecretProvider jwtSecretProvider;
+
+    public AuthInterceptor(JwtSecretProvider jwtSecretProvider) {
+        this.jwtSecretProvider = jwtSecretProvider;
+    }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -29,18 +31,36 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
         String auth = request.getHeader("Authorization");
+        // <image>/wx.previewImage 无法携带 Authorization 头，
+        // 文件读取类 GET 允许通过 ?token= 查询参数传递（其余接口仍只认 header）
+        if ((auth == null || !auth.startsWith("Bearer ")) && isFileRead(request)) {
+            String token = request.getParameter("token");
+            if (token != null && !token.isBlank()) {
+                auth = "Bearer " + token;
+            }
+        }
         if (auth == null || !auth.startsWith("Bearer ")) {
             AuthContext.clear();
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "未登录");
         }
         try {
-            Long userId = JwtUtil.verify(auth.substring(7), jwtSecret);
+            Long userId = JwtUtil.verify(auth.substring(7), jwtSecretProvider.get());
             AuthContext.set(userId);
             return true;
         } catch (Exception e) {
             AuthContext.clear();
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "登录已过期或无效");
         }
+    }
+
+    private boolean isFileRead(HttpServletRequest request) {
+        if (!"GET".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+        String uri = request.getRequestURI();
+        String context = request.getContextPath();
+        String path = context != null && uri.startsWith(context) ? uri.substring(context.length()) : uri;
+        return path.startsWith("/files/");
     }
 
     @Override

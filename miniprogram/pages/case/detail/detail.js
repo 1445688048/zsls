@@ -80,7 +80,8 @@ Page({
   },
 
   onTabChange(e) {
-    this.setData({ activeTab: e.detail.value });
+    // tap 事件的取值在 currentTarget.dataset（wxml 绑定 data-tab），e.detail 只有坐标
+    this.setData({ activeTab: e.currentTarget.dataset.tab });
   },
 
   onNavigate(e) {

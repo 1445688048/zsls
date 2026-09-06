@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS app_user (
     openid         VARCHAR(64) UNIQUE NOT NULL,
     nickname       VARCHAR(128),
     avatar_url     VARCHAR(512),
-    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 案件档案
@@ -57,27 +58,16 @@ CREATE TABLE IF NOT EXISTS law_cache (
     created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- LLM 配置
-CREATE TABLE IF NOT EXISTS llm_config (
-    config_id      BIGSERIAL PRIMARY KEY,
-    user_id        BIGINT REFERENCES app_user(user_id),
-    provider_name  VARCHAR(64) NOT NULL,
-    base_url       VARCHAR(256),
-    api_key        VARCHAR(256) NOT NULL,
-    model_name     VARCHAR(64),
-    temperature    DECIMAL(3,2) DEFAULT 0.3,
-    max_tokens     INT DEFAULT 4096,
-    is_active      BOOLEAN DEFAULT TRUE,
-    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- 向量表
+-- embedding_text 为实体当前实际读写的文本向量列（与 H2 schema.sql 对齐）；
+-- embedding (pgvector) 为后续向量检索预留，当前无代码写入。
 CREATE TABLE IF NOT EXISTS domain_knowledge_vector (
     id             BIGSERIAL PRIMARY KEY,
     domain_type    VARCHAR(32) NOT NULL,
     content_type   VARCHAR(32) NOT NULL,
     content_id     VARCHAR(64) NOT NULL,
     text_chunk     TEXT NOT NULL,
+    embedding_text TEXT,
     embedding      vector(1536),
     metadata_json  JSONB DEFAULT '{}',
     created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -101,7 +91,6 @@ CREATE INDEX IF NOT EXISTS idx_tle_case ON timeline_event(case_id);
 CREATE INDEX IF NOT EXISTS idx_dkv_domain ON domain_knowledge_vector(domain_type);
 CREATE INDEX IF NOT EXISTS idx_dkv_content_type ON domain_knowledge_vector(content_type);
 CREATE INDEX IF NOT EXISTS idx_dkv_embedding ON domain_knowledge_vector USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
-CREATE INDEX IF NOT EXISTS idx_llm_config_user_active ON llm_config(user_id, is_active) WHERE is_active = true;
 CREATE INDEX IF NOT EXISTS idx_case_profile_user ON case_profile(user_id);
 CREATE INDEX IF NOT EXISTS idx_case_profile_domain ON case_profile(domain_type);
 CREATE INDEX IF NOT EXISTS idx_chat_session_case ON chat_session(case_id);

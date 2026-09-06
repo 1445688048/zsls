@@ -62,7 +62,13 @@ public class PromptBuilder {
         sb.append("### 法律提示\n引用相关法条。\n\n");
         sb.append("### 证据建议\n列出建议收集的证据。\n\n");
         sb.append("### 追问\n提出 2-3 个补充问题。\n\n");
-        sb.append("### 免责声明\n⚠️ 本结果由 AI 生成，仅供参考。\n");
+        sb.append("### 免责声明\n⚠️ 本结果由 AI 生成，仅供参考。\n\n");
+        // 事实提取约定：FactExtractor 只解析围栏 JSON 中显式的 "facts" 键，
+        // 模型必须严格按此格式输出新确认的事实，其余 JSON 不会被视为事实。
+        sb.append("## 事实更新（可选）\n");
+        sb.append("仅当本轮对话确认了新的事实时，在回复最末尾输出：\n");
+        sb.append("```json\n{\"facts\": {\"字段名\": {\"value\": \"值\", \"confidence\": \"HIGH\"}}}\n```\n");
+        sb.append("字段名使用事实要素 Schema 中的英文字段名；没有新事实则完全省略此节，不要输出其他 JSON。\n");
 
         // 5. Schema 参考
         DomainPlugin plugin = pluginLoader.getPlugin(caseProfile.getDomainType());

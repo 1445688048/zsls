@@ -4,6 +4,7 @@ package com.palmlawyer.service;
 
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.palmlawyer.entity.CaseProfile;
+import com.palmlawyer.entity.TimelineEvent;
 import com.palmlawyer.mapper.CaseProfileMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,8 +23,10 @@ import java.util.Map;
 public class ExportService {
 
     private static final String FONT_FAMILY = "ExportCJK";
+    private static final String FONT_TEMP_PREFIX = "export-font-";
 
     private final CaseProfileMapper caseMapper;
+    private final TimelineService timelineService;
 
     @Value("${palmlawyer.storage.local-path}")
     private String storagePath;
@@ -35,8 +38,9 @@ public class ExportService {
     @Value("${palmlawyer.storage.font-path:}")
     private String fontPath;
 
-    public ExportService(CaseProfileMapper caseMapper) {
+    public ExportService(CaseProfileMapper caseMapper, TimelineService timelineService) {
         this.caseMapper = caseMapper;
+        this.timelineService = timelineService;
     }
 
     public Map<String, Object> generatePdf(Long caseId, boolean redact) {
@@ -48,13 +52,14 @@ public class ExportService {
         String html = renderHtml(caseProfile, redact);
         String fileName = "opinion-" + System.currentTimeMillis() + ".pdf";
         Path dir = Paths.get(storagePath, String.valueOf(caseId)).toAbsolutePath().normalize();
+        Path fontTemp = null;
         try {
             Files.createDirectories(dir);
             Path out = dir.resolve(fileName);
             try (OutputStream os = Files.newOutputStream(out)) {
                 PdfRendererBuilder builder = new PdfRendererBuilder();
                 builder.useFastMode();
-                registerFont(builder);
+                fontTemp = registerFont(builder);
                 builder.withHtmlContent(html, null);
                 builder.toStream(os);
                 builder.run();
@@ -63,6 +68,15 @@ public class ExportService {
         } catch (Exception e) {
             log.error("PDF 生成失败: caseId={}", caseId, e);
             throw new IllegalStateException("PDF 生成失败: " + e.getMessage(), e);
+        } finally {
+            // classpath 字体被复制到临时文件使用，渲染结束后立即清理，避免每次导出泄漏一个文件
+            if (fontTemp != null) {
+                try {
+                    Files.deleteIfExists(fontTemp);
+                } catch (Exception cleanupError) {
+                    log.debug("字体临时文件清理失败: {}", fontTemp, cleanupError);
+                }
+            }
         }
 
         Map<String, Object> result = new HashMap<>();
@@ -75,25 +89,26 @@ public class ExportService {
     }
 
     /**
-     * 注册中文字体，优先级：
+     * 注册中文字体，返回本次注册使用的字体文件路径（若为本次生成的临时文件，调用方负责删除）。
+     * 优先级：
      * 1) 配置的外部字体路径（palmlawyer.storage.font-path）；
-     * 2) classpath:/fonts/ 下的第一个 ttf；
+     * 2) classpath:/fonts/ 下的第一个 ttf（复制到临时文件）；
      * 3) Windows 系统 msyh.ttc（仅本机开发可用，生产请放置字体文件）。
      */
-    private void registerFont(PdfRendererBuilder builder) throws Exception {
+    private Path registerFont(PdfRendererBuilder builder) throws Exception {
         Path external = fontPath == null || fontPath.isBlank() ? null : Paths.get(fontPath);
         if (external != null && Files.exists(external)) {
             useFont(builder, external);
-            return;
+            return null;
         }
         try {
             var resolver = new org.springframework.core.io.support.PathMatchingResourcePatternResolver();
             var res = resolver.getResources("classpath:fonts/*.ttf");
             if (res.length > 0) {
-                Path tmp = Files.createTempFile("export-font-", ".ttf");
+                Path tmp = Files.createTempFile(FONT_TEMP_PREFIX, ".ttf");
                 Files.copy(res[0].getInputStream(), tmp, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 useFont(builder, tmp);
-                return;
+                return tmp;
             }
         } catch (Exception e) {
             log.debug("classpath fonts 扫描失败: {}", e.getMessage());
@@ -102,7 +117,7 @@ public class ExportService {
         Path arialuni = Paths.get("C:/Windows/Fonts/arialuni.ttf");
         if (Files.exists(arialuni)) {
             useFont(builder, arialuni);
-            return;
+            return null;
         }
         throw new IllegalStateException("未找到可用的中文字体：请将 TTF 放入 backend/src/main/resources/fonts/ 或配置 palmlawyer.storage.font-path");
     }
@@ -149,14 +164,15 @@ public class ExportService {
         }
 
         sb.append("<h2>时间轴</h2>");
-        List<Map<String, Object>> timeline = c.getTimelineJson();
+        // 时间轴事件存独立 timeline_event 表（timelineJson 字段已废弃），从 TimelineService 读取
+        List<TimelineEvent> timeline = timelineService.list(c.getCaseId());
         if (timeline == null || timeline.isEmpty()) {
             sb.append("<p>暂无时间轴事件</p>");
         } else {
             sb.append("<table><tr><th>时间</th><th>事件</th></tr>");
-            for (Map<String, Object> ev : timeline) {
-                sb.append("<tr><td>").append(esc(String.valueOf(ev.getOrDefault("time", ev.getOrDefault("eventTime", "")))))
-                  .append("</td><td>").append(esc(String.valueOf(ev.getOrDefault("description", "")))).append("</td></tr>");
+            for (TimelineEvent ev : timeline) {
+                sb.append("<tr><td>").append(esc(String.valueOf(ev.getEventTime() == null ? "" : ev.getEventTime())))
+                  .append("</td><td>").append(esc(String.valueOf(ev.getDescription() == null ? "" : ev.getDescription()))).append("</td></tr>");
             }
             sb.append("</table>");
         }

@@ -3,6 +3,7 @@
 package com.palmlawyer.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.palmlawyer.config.JwtSecretProvider;
 import com.palmlawyer.entity.AppUser;
 import com.palmlawyer.mapper.AppUserMapper;
 import com.palmlawyer.util.AuthContext;
@@ -35,10 +36,12 @@ import java.util.Map;
 public class AuthController {
 
     private final AppUserMapper userMapper;
+    private final JwtSecretProvider jwtSecretProvider;
     private final RestClient restClient = RestClient.create();
 
-    public AuthController(AppUserMapper userMapper) {
+    public AuthController(AppUserMapper userMapper, JwtSecretProvider jwtSecretProvider) {
         this.userMapper = userMapper;
+        this.jwtSecretProvider = jwtSecretProvider;
     }
 
     @Value("${palmlawyer.wechat.app-id}")
@@ -49,9 +52,6 @@ public class AuthController {
 
     @Value("${palmlawyer.auth.dev-mode}")
     private boolean devMode;
-
-    @Value("${palmlawyer.security.jwt.secret}")
-    private String jwtSecret;
 
     @Value("${palmlawyer.security.jwt.expiration}")
     private String jwtExpiration;
@@ -77,7 +77,7 @@ public class AuthController {
             return n;
         });
 
-        String token = JwtUtil.issue(user.getUserId(), jwtSecret, parseTtlMillis(jwtExpiration));
+        String token = JwtUtil.issue(user.getUserId(), jwtSecretProvider.get(), parseTtlMillis(jwtExpiration));
         Map<String, Object> result = new HashMap<>();
         result.put("token", token);
         result.put("userId", user.getUserId());

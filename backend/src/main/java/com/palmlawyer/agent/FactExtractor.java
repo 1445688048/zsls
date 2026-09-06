@@ -7,9 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -20,8 +18,8 @@ import java.util.regex.Pattern;
  * <p>从 LLM 回复中提取结构化事实数据，用于更新案件的事实要素。
  * <p>提取规则：
  * <ol>
- *   <li>优先解析 ```json 代码围栏中的 JSON；</li>
- *   <li>否则扫描所有顶层平衡花括号块，倒序尝试解析；</li>
+ *   <li>只解析 ```json 代码围栏中带显式 "facts" 键的 JSON（PromptBuilder 已约定该输出格式）；</li>
+ *   <li>不扫描正文中的裸 JSON——回复中的示例代码、引用片段不得被误当事实合并；</li>
  *   <li>facts 值统一包装为 {value, confidence}，与既有数据结构一致。</li>
  * </ol>
  */
@@ -71,27 +69,21 @@ public class FactExtractor {
     // ========== 内部方法 ==========
 
     /**
-     * 定位 facts 节点：优先围栏 JSON，其次平衡花括号块
+     * 定位 facts 节点：只接受围栏 JSON 中显式的 "facts" 键，避免把回复中的任意 JSON 当事实
      */
     private JsonNode findFactsNode(String text) {
         Matcher m = FENCE.matcher(text);
         while (m.find()) {
-            JsonNode facts = extractFactsFrom(tryParse(m.group(1)));
-            if (facts != null) return facts;
-        }
-
-        List<String> blocks = extractBalancedBlocks(text);
-        for (int i = blocks.size() - 1; i >= 0; i--) {
-            JsonNode facts = extractFactsFrom(tryParse(blocks.get(i)));
-            if (facts != null) return facts;
+            JsonNode node = tryParse(m.group(1));
+            if (node == null || !node.isObject() || !node.has(FACT_SECTION)) {
+                continue;
+            }
+            JsonNode facts = node.get(FACT_SECTION);
+            if (facts != null && facts.isObject()) {
+                return facts;
+            }
         }
         return null;
-    }
-
-    private JsonNode extractFactsFrom(JsonNode node) {
-        if (node == null || !node.isObject()) return null;
-        JsonNode facts = node.has(FACT_SECTION) ? node.get(FACT_SECTION) : node;
-        return facts != null && facts.isObject() ? facts : null;
     }
 
     private JsonNode tryParse(String s) {
@@ -100,30 +92,6 @@ public class FactExtractor {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    /**
-     * 栈深扫描所有顶层平衡花括号块（按文本顺序返回）
-     */
-    private List<String> extractBalancedBlocks(String text) {
-        List<String> blocks = new ArrayList<>();
-        int depth = 0;
-        int start = -1;
-        char[] cs = text.toCharArray();
-        for (int i = 0; i < cs.length; i++) {
-            char c = cs[i];
-            if (c == '{') {
-                if (depth == 0) start = i;
-                depth++;
-            } else if (c == '}') {
-                if (depth > 0) depth--;
-                if (depth == 0 && start >= 0) {
-                    blocks.add(text.substring(start, i + 1));
-                    start = -1;
-                }
-            }
-        }
-        return blocks;
     }
 
     private boolean isHighConfidence(JsonNode node) {

@@ -56,7 +56,9 @@ Page({
         url: "/chat/sessions/" + this.data.sessionId + "/messages",
         method: "GET",
       });
-      this.setData({ messages: messages || [], loading: false });
+      // 每条消息带唯一 _key 供 wx:key 使用（服务端消息用 id，本地乐观消息用前缀+时间戳）
+      const withKeys = (messages || []).map((m, i) => ({ ...m, _key: m.id != null ? "s" + m.id : "l" + i }));
+      this.setData({ messages: withKeys, loading: false });
       this.scrollToBottom();
     } catch (e) {
       console.error("加载消息失败:", e);
@@ -75,8 +77,8 @@ Page({
     if (!text || this.data.isStreaming) return;
 
     // 乐观渲染用户消息 + 空的助手消息（流式内容追加到这里）
-    const userMsg = { role: "user", content: text, created_at: new Date().toISOString() };
-    const assistantMsg = { role: "assistant", content: "", streaming: true };
+    const userMsg = { role: "user", content: text, created_at: new Date().toISOString(), _key: "u" + Date.now() };
+    const assistantMsg = { role: "assistant", content: "", streaming: true, _key: "a" + Date.now() };
     const messages = [...this.data.messages, userMsg, assistantMsg];
     this._assistantIdx = messages.length - 1;
     this.setData({ messages, inputText: "", isStreaming: true, canSend: false });

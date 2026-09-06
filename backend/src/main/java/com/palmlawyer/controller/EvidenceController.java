@@ -2,6 +2,7 @@
 // 证据管理：文件上传落盘 + evidenceRefs 回写（属主校验）
 package com.palmlawyer.controller;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.palmlawyer.entity.CaseProfile;
 import com.palmlawyer.mapper.CaseProfileMapper;
 import com.palmlawyer.service.CaseGuard;
@@ -38,6 +39,10 @@ public class EvidenceController {
     private final CaseProfileMapper caseMapper;
     private final CaseGuard caseGuard;
     private final CaseStatusService caseStatusService;
+
+    /** 只更新 evidence_refs 列时需显式指定 TypeHandler（实体注解仅在整实体模式生效） */
+    private static final String JSON_TYPE_HANDLER =
+            "typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler";
 
     @Value("${palmlawyer.storage.local-path}")
     private String storagePath;
@@ -86,9 +91,7 @@ public class EvidenceController {
         CaseProfile c = caseMapper.selectById(caseId);
         List<Map<String, Object>> refs = new ArrayList<>(c.getEvidenceRefs() != null ? c.getEvidenceRefs() : new ArrayList<>());
         refs.add(ref);
-        c.setEvidenceRefs(refs);
-        c.setUpdatedAt(LocalDateTime.now());
-        caseMapper.updateById(c);
+        saveRefs(caseId, refs);
         caseStatusService.reevaluate(caseId);
         log.info("证据上传: caseId={}, refId={}, file={}", caseId, refId, safeName);
         return ref;
@@ -124,9 +127,7 @@ public class EvidenceController {
         if (body.containsKey("collected")) target.put("collected", Boolean.TRUE.equals(body.get("collected")));
         if (body.containsKey("name")) target.put("name", String.valueOf(body.get("name")));
 
-        c.setEvidenceRefs(refs);
-        c.setUpdatedAt(LocalDateTime.now());
-        caseMapper.updateById(c);
+        saveRefs(caseId, refs);
         caseStatusService.reevaluate(caseId);
         return target;
     }
@@ -141,12 +142,18 @@ public class EvidenceController {
         CaseProfile c = caseMapper.selectById(caseId);
         List<Map<String, Object>> refs = new ArrayList<>(c.getEvidenceRefs() != null ? c.getEvidenceRefs() : new ArrayList<>());
         refs.removeIf(r -> refId.equals(r.get("refId")));
-        c.setEvidenceRefs(refs);
-        c.setUpdatedAt(LocalDateTime.now());
-        caseMapper.updateById(c);
+        saveRefs(caseId, refs);
         caseStatusService.reevaluate(caseId);
         log.info("证据删除: caseId={}, refId={}", caseId, refId);
         return Map.of("msg", "deleted", "refId", refId);
+    }
+
+    /** 只更新 evidence_refs 与 updated_at 两列，避免整实体回写覆盖 facts/laws 等并发写入的列 */
+    private void saveRefs(Long caseId, List<Map<String, Object>> refs) {
+        caseMapper.update(null, new LambdaUpdateWrapper<CaseProfile>()
+                .eq(CaseProfile::getCaseId, caseId)
+                .set(CaseProfile::getEvidenceRefs, refs, JSON_TYPE_HANDLER)
+                .set(CaseProfile::getUpdatedAt, LocalDateTime.now()));
     }
 
     /** 清洗文件名：仅保留文件名，禁止路径分隔符与 .. */

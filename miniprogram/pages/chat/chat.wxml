@@ -4,14 +4,9 @@
     <view class="case-title">{{caseTitle}}</view>
   </view>
   <scroll-view class="messages" scroll-y scroll-with-animation scroll-into-view="{{scrollInto}}">
-    <view wx:for="{{messages}}" wx:key="index" id="msg-{{index}}" class="message {{item.role === 'user' ? 'message-user' : 'message-assistant'}}">
+    <view wx:for="{{messages}}" wx:key="_key" id="msg-{{index}}" class="message {{item.role === 'user' ? 'message-user' : 'message-assistant'}}">
       <view class="bubble">
         {{item.content}}<text wx:if="{{item.streaming}}" class="cursor">▌</text>
-      </view>
-    </view>
-    <view wx:if="{{isStreaming && messages.length === 0}}" class="message message-assistant">
-      <view class="bubble typing">
-        <text class="dot"></text><text class="dot"></text><text class="dot"></text>
       </view>
     </view>
   </scroll-view>

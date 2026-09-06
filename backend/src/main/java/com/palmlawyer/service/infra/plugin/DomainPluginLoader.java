@@ -9,18 +9,20 @@ import jakarta.annotation.PostConstruct;
 
 import java.io.InputStream;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 领域插件加载器
- * 
+ *
  * <p>启动时从 classpath:plugins/*.yaml 加载所有领域插件。
  * 使用 PathMatchingResourcePatternResolver 兼容 jar 包和 IDE 运行环境。
+ * <p>插件 Map 为 ConcurrentHashMap：热重载（请求线程写）与查询（其他请求线程读）并发安全。
  */
 @Slf4j
 @Component
 public class DomainPluginLoader {
 
-    private final Map<String, DomainPlugin> plugins = new HashMap<>();
+    private final Map<String, DomainPlugin> plugins = new ConcurrentHashMap<>();
     
     private final PathMatchingResourcePatternResolver resourceResolver = new PathMatchingResourcePatternResolver();
 

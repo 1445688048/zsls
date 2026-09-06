@@ -98,5 +98,5 @@ CREATE INDEX IF NOT EXISTS idx_dkv_content_type ON domain_knowledge_vector(conte
 -- 1. 使用 MODE=PostgreSQL 兼容 PostgreSQL 语法
 -- 2. CLOB 类型用于存储大文本（JSON 数据）
 -- 3. 向量扩展在 H2 中不可用，生产环境需迁移到 PostgreSQL + pgvector
--- 4. 切换到 PostgreSQL 时，取消注释 application.yml 中的 PostgreSQL 配置
--- 5. PostgreSQL 需要执行 backend/db/init.sql（包含 pgvector 扩展）
+-- 4. 切换到 PostgreSQL：启用 prod profile（--spring.profiles.active=prod，
+--    见 application-prod.yml；建表执行 backend/db/init.sql，两份脚本需保持同步）

@@ -66,6 +66,8 @@ Page({
       console.error("导出失败:", err);
       wx.showToast({ title: "导出失败: " + (err.message || "未知错误"), icon: "none" });
     } finally {
+      // 下载失败路径也要收起 loading，否则蒙层永久停留且吞掉 toast
+      wx.hideLoading();
       this.setData({ generating: false });
     }
   },

@@ -48,7 +48,9 @@ Page({
   },
 
   onDeadlineToggle(e) {
-    this.setData({ newEvent: { ...this.data.newEvent, isDeadline: e.detail.value } });
+    // 独立 checkbox 的 e.detail.value 是数组（选中 [value] / 未选中 []），需转为布尔
+    const checked = Array.isArray(e.detail.value) ? e.detail.value.length > 0 : !!e.detail.value;
+    this.setData({ newEvent: { ...this.data.newEvent, isDeadline: checked } });
   },
 
   onTypeChange(e) {

@@ -27,10 +27,14 @@ public class EvidenceAdvisor {
 
     /**
      * 生成证据建议
+     *
+     * @param state                案件状态（facts 用于 applicableWhen 条件求值）
+     * @param collectedEvidenceIds 已收集证据的 id 集合（来自 case_profile.evidenceRefs 中 collected=true 的 refId）
      */
-    public EvidenceAdvice advise(AgentState state) {
+    public EvidenceAdvice advise(AgentState state, Set<String> collectedEvidenceIds) {
         DomainPlugin plugin = pluginLoader.getPlugin(state.getDomainType());
         EvidenceAdvice advice = new EvidenceAdvice();
+        Set<String> collected = collectedEvidenceIds != null ? collectedEvidenceIds : Set.of();
 
         if (plugin == null || plugin.getEvidenceRules() == null) {
             log.debug("领域插件或证据规则不存在: {}", state.getDomainType());
@@ -41,7 +45,7 @@ public class EvidenceAdvisor {
         List<DomainPlugin.EvidenceItem> necessary = plugin.getEvidenceRules().getNecessary();
         if (necessary != null) {
             for (DomainPlugin.EvidenceItem item : necessary) {
-                if (isMissing(state.getFacts(), item)) {
+                if (isMissing(state.getFacts(), item, collected)) {
                     advice.getMissingNecessary().add(item);
                 }
             }
@@ -51,7 +55,7 @@ public class EvidenceAdvisor {
         List<DomainPlugin.EvidenceItem> enhancing = plugin.getEvidenceRules().getEnhancing();
         if (enhancing != null) {
             for (DomainPlugin.EvidenceItem item : enhancing) {
-                if (isApplicable(state.getFacts(), item) && isMissing(state.getFacts(), item)) {
+                if (isApplicable(state.getFacts(), item) && isMissing(state.getFacts(), item, collected)) {
                     advice.getMissingEnhancing().add(item);
                 }
             }
@@ -64,11 +68,13 @@ public class EvidenceAdvisor {
     }
 
     /**
-     * 判断证据是否缺失（facts 中存在 evidence_<id> 标记视为已收集）
+     * 判断证据是否缺失：evidenceRefs 中已标记收集，或 facts 中存在 evidence_<id> 标记，均视为已收集
      */
-    private boolean isMissing(Map<String, Object> facts, DomainPlugin.EvidenceItem item) {
-        String evidenceKey = "evidence_" + item.getId();
-        if (facts.get(evidenceKey) != null) {
+    private boolean isMissing(Map<String, Object> facts, DomainPlugin.EvidenceItem item, Set<String> collectedEvidenceIds) {
+        if (collectedEvidenceIds.contains(item.getId())) {
+            return false;
+        }
+        if (facts.get("evidence_" + item.getId()) != null) {
             return false;
         }
         return isApplicable(facts, item);

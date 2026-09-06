@@ -49,8 +49,24 @@ function rawRequest(options) {
   });
 }
 
+/** 确保本地有 token：没有时静默登录一次（reLoginInFlight 防并发踩踏） */
+async function ensureToken() {
+  const existing = getToken();
+  if (existing) return existing;
+  if (reLoginInFlight) return null;
+  reLoginInFlight = true;
+  try {
+    const fresh = await silentLogin();
+    return fresh.token;
+  } catch (e) {
+    return null;
+  } finally {
+    reLoginInFlight = false;
+  }
+}
+
 async function request({ url, method = "GET", data = {}, header = {}, enableChunked = false }) {
-  const token = getToken();
+  const token = await ensureToken();
   if (!token) {
     return Promise.reject(new Error("未登录，请先调用 getApp().ensureLogin()"));
   }
@@ -109,4 +125,4 @@ async function request({ url, method = "GET", data = {}, header = {}, enableChun
   throw new Error("请求失败(" + res.statusCode + ")");
 }
 
-module.exports = { request, BASE_URL };
+module.exports = { request, silentLogin, BASE_URL };

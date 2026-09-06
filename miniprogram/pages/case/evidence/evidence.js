@@ -18,6 +18,10 @@ Page({
     if (caseId) {
       this.setData({ caseId });
       this.loadEvidence(caseId);
+    } else {
+      // 无案件上下文：结束 loading 并引导返回，避免后续请求打到 /cases/null
+      this.setData({ loading: false });
+      wx.showToast({ title: "缺少案件参数，请从案件详情进入", icon: "none" });
     }
   },
 
@@ -32,7 +36,9 @@ Page({
       const collectedIds = {};
       refs.forEach((r) => { if (r.collected) collectedIds[r.refId] = true; });
       // 列表只展示有 url 的真实上传文件；canned 标记产生的无 url ref 仅用于收集状态
-      const uploadedRefs = refs.filter((r) => !!r.url);
+      // 文件接口受 JWT 保护，<image>/previewImage 无法带 header，改为在 URL 上拼 token 查询参数
+      const token = getToken() || "";
+      const uploadedRefs = refs.filter((r) => !!r.url).map((r) => ({ ...r, url: this.withToken(r.url, token) }));
 
       const necessary = [
         { id: "contract", name: "劳动合同", description: "证明劳动关系、薪资标准、合同期限", collected: !!collectedIds.contract },
@@ -69,7 +75,7 @@ Page({
         for (const f of files) {
           try {
             const ref = await this.uploadOne(f.tempFilePath);
-            if (ref) uploaded.push(ref);
+            if (ref) uploaded.push({ ...ref, url: this.withToken(ref.url, getToken() || "") });
           } catch (e) {
             console.error("上传失败:", f.tempFilePath, e);
           }
@@ -164,6 +170,11 @@ Page({
         }
       },
     });
+  },
+
+  withToken(url, token) {
+    if (!url || !token) return url;
+    return url + (url.indexOf("?") >= 0 ? "&" : "?") + "token=" + encodeURIComponent(token);
   },
 
   onPreviewImage(e) {

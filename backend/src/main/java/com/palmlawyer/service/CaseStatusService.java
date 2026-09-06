@@ -55,11 +55,12 @@ public class CaseStatusService {
         }
 
         if (next != null && rank(next) > rank(c.getStatus())) {
+            String prev = c.getStatus();
             c.setStatus(next);
             c.setUpdatedAt(LocalDateTime.now());
             caseMapper.updateById(c);
             log.info("案件 {} 状态流转: {} -> {} (facts={}, evidence={})",
-                    caseId, c.getStatus(), next, factCount, evidenceCount);
+                    caseId, prev, next, factCount, evidenceCount);
         }
     }
 

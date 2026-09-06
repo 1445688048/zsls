@@ -54,7 +54,7 @@
   <!-- 法律意见 Tab -->
   <view wx:if="{{activeTab === 'law'}}" class="tab-content">
     <view wx:if="{{laws.length === 0}}" class="law-hint">暂无引用法条，请先与 AI 对话</view>
-    <view wx:for="{{laws}}" wx:key="index" class="law-item">
+    <view wx:for="{{laws}}" wx:key="article" class="law-item">
       <view class="law-title">{{item.lawTitle}} {{item.article}}</view>
       <view class="law-content">{{item.content}}</view>
     </view>

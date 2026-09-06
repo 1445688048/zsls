@@ -1,12 +1,5 @@
 # ===== 掌上律师 MVP - 开发环境配置（启动时加 --spring.profiles.active=dev） =====
 
-# H2 控制台仅开发环境开放（本机访问）
-spring:
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-
 palmlawyer:
   # 业务层 H2 控制台开关（H2ConsoleConfig 条件装配）
   h2-console:
@@ -14,3 +7,7 @@ palmlawyer:
   # 开发环境 CORS 放行任意来源（小程序开发者工具调试）
   cors:
     allowed-origins: "*"
+  auth:
+    # 开发模式：微信登录失败时用 code 派生 openid 兜底，方便本地调试。
+    # 仅限 dev profile 开启，默认 profile 与 prod 均为 false。
+    dev-mode: true

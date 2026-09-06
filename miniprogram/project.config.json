@@ -38,11 +38,16 @@
     "packNpmRelationList": [],
     "minifyWXSS": true,
     "showES6CompileOption": false,
-    "minifyWXML": true
+    "minifyWXML": true,
+    "compileWorklet": false,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false
   },
   "compileType": "miniprogram",
   "libVersion": "3.3.4",
-  "appid": "touristappId",
+  "appid": "wx9a9175ad09b78bdf",
   "projectname": "palm-lawyer",
   "simulatorType": "wechat",
   "simulatorPluginLibVersion": {},

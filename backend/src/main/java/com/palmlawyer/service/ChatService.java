@@ -3,6 +3,7 @@
 package com.palmlawyer.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.palmlawyer.agent.DisclaimerService;
 import com.palmlawyer.agent.EvidenceAdvisor;
 import com.palmlawyer.agent.FactExtractor;
@@ -27,6 +28,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -35,6 +37,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 对话服务
@@ -53,6 +57,10 @@ public class ChatService {
 
     private static final int HISTORY_WINDOW = 20;
     private static final int LAW_REF_TOPK = 3;
+
+    /** LambdaUpdateWrapper 更新 JSON 列时需显式指定 TypeHandler（实体上的 @TableField 注解只在整实体模式生效） */
+    private static final String JSON_TYPE_HANDLER =
+            "typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler";
 
     private final ChatModel chatModel;
     private final ChatSessionMapper sessionMapper;
@@ -112,6 +120,10 @@ public class ChatService {
      * 流式对话（SSE）：Agent 编排主流程
      */
     public Flux<String> chatStream(Long sessionId, String userMessage) {
+        return chatStreamInternal(sessionId, userMessage, null);
+    }
+
+    private Flux<String> chatStreamInternal(Long sessionId, String userMessage, CompletableFuture<Void> persisted) {
         ChatSession session = sessionMapper.selectById(sessionId);
         if (session == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "会话不存在");
@@ -123,7 +135,7 @@ public class ChatService {
 
         saveMessage(sessionId, "user", userMessage);
 
-        // 1) 系统提示词（角色 + 案件事实 + 领域 Schema + 本题参考法条）
+        // 1) 系统提示词（角色 + 案件事实 + 证据收集状态 + 领域 Schema + 本题参考法条）
         List<Message> messages = new ArrayList<>();
         messages.add(new SystemMessage(buildSystemPrompt(caseProfile, userMessage)));
 
@@ -146,17 +158,33 @@ public class ChatService {
                 chatModel.stream(new Prompt(messages)).map(this::extractText).filter(s -> !s.isEmpty()),
                 Flux.just("\n\n" + disclaimerService.getDisclaimer()))
             .doOnNext(full::append)
-            .doOnComplete(() -> afterAnswer(sessionId, caseProfile, userMessage, full.toString()));
+            .doOnComplete(() -> {
+                String snapshot = full.toString();
+                // 落库包含阻塞 JDBC/HTTP，不能在 Reactor/Netty 事件循环线程上执行，调度到弹性线程池
+                Schedulers.boundedElastic().schedule(() -> {
+                    try {
+                        afterAnswer(sessionId, caseProfile, userMessage, snapshot);
+                    } finally {
+                        if (persisted != null) persisted.complete(null);
+                    }
+                });
+            });
     }
 
     /**
-     * 非流式对话（测试/兜底场景），复用同一编排
+     * 非流式对话（测试/兜底场景），复用同一编排；等待落库完成后再返回最新助手消息
      */
     public String chat(Long sessionId, String userMessage) {
-        StringBuilder full = new StringBuilder();
-        chatStream(sessionId, userMessage).blockLast();
-        // blockLast 后需重新读取助手消息（流式路径已保存），此处返回最新一条
+        CompletableFuture<Void> persisted = new CompletableFuture<>();
+        chatStreamInternal(sessionId, userMessage, persisted).blockLast();
+        try {
+            persisted.get(60, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            Thread.currentThread().interrupt();
+        }
+        // 落库完成后重新读取助手消息
         List<ChatMessage> msgs = messageMapper.selectBySessionId(sessionId);
+        StringBuilder full = new StringBuilder();
         if (!msgs.isEmpty()) {
             ChatMessage last = msgs.get(msgs.size() - 1);
             if ("assistant".equals(last.getRole())) {
@@ -185,10 +213,32 @@ public class ChatService {
     // ========== 内部方法 ==========
 
     /**
-     * 构建系统提示词：领域 Schema + 本题参考法条（top3）
+     * 构建系统提示词：领域 Schema + 证据收集状态 + 本题参考法条（top3）
      */
     private String buildSystemPrompt(CaseProfile caseProfile, String userMessage) {
         StringBuilder sb = new StringBuilder(promptBuilder.build(caseProfile));
+
+        // 注入真实证据收集状态，使模型的"证据建议"与实际上传/勾选一致
+        try {
+            EvidenceAdvisor.EvidenceAdvice advice =
+                    evidenceAdvisor.advise(new AgentState(caseProfile.getDomainType(), caseProfile.getFactsJson()),
+                            collectedEvidenceIds(caseProfile));
+            if (advice.hasMissingNecessary() || advice.hasEarlyWarnings()) {
+                sb.append("\n## 证据收集状态\n");
+                if (advice.hasMissingNecessary()) {
+                    sb.append("仍缺失的必要证据：");
+                    advice.getMissingNecessary().forEach(i -> sb.append(i.getName() != null ? i.getName() : i.getId()).append("、"));
+                    sb.setLength(sb.length() - 1);
+                    sb.append("。请在证据建议中优先提示用户补充。\n");
+                }
+                for (Map<String, String> w : advice.getEarlyWarnings()) {
+                    sb.append("风险预警：").append(w.getOrDefault("warningText", "")).append("\n");
+                }
+            }
+        } catch (Exception e) {
+            log.warn("证据状态注入失败(不影响对话): {}", e.getMessage());
+        }
+
         try {
             List<LawStarResponse.ArticleResult> refs = lawService.search(userMessage, "全国");
             if (refs != null && !refs.isEmpty()) {
@@ -203,6 +253,20 @@ public class ChatService {
         return sb.toString();
     }
 
+    /** 提取案件已收集证据的 refId 集合（evidenceRefs 中 collected=true 的项） */
+    private Set<String> collectedEvidenceIds(CaseProfile caseProfile) {
+        Set<String> ids = new HashSet<>();
+        List<Map<String, Object>> refs = caseProfile.getEvidenceRefs();
+        if (refs == null) return ids;
+        for (Map<String, Object> r : refs) {
+            Object refId = r.get("refId");
+            if (refId != null && Boolean.TRUE.equals(r.get("collected"))) {
+                ids.add(String.valueOf(refId));
+            }
+        }
+        return ids;
+    }
+
     private String extractText(ChatResponse response) {
         if (response.getResult() != null && response.getResult().getOutput() != null) {
             String text = response.getResult().getOutput().getText();
@@ -212,7 +276,8 @@ public class ChatService {
     }
 
     /**
-     * 流式完成后的落库与案件回写（各子步骤独立 try/catch，互不拖累）
+     * 流式完成后的落库与案件回写（各子步骤独立 try/catch，互不拖累）。
+     * 全程可能运行在弹性线程池上，只做精准列更新，不整实体回写，降低并发覆盖面。
      */
     private void afterAnswer(Long sessionId, CaseProfile caseProfile, String userMessage, String fullResponse) {
         if (fullResponse == null || fullResponse.isEmpty()) {
@@ -226,10 +291,11 @@ public class ChatService {
             log.error("保存助手消息失败: sessionId={}", sessionId, e);
         }
 
+        Map<String, Object> mergedFacts = caseProfile.getFactsJson();
         try {
             Map<String, Object> facts = factExtractor.extract(fullResponse, caseProfile.getFactsJson());
             if (!facts.isEmpty()) {
-                caseProfile.setFactsJson(facts);
+                mergedFacts = facts;
                 log.info("会话 {} 案件事实已提取: {} 个字段", sessionId, facts.size());
             }
         } catch (Exception e) {
@@ -237,20 +303,36 @@ public class ChatService {
         }
 
         // 本轮引用法条合并落库（F3）
-        mergeLawRefs(caseProfile, userMessage);
-
-        // 统一落库 + 状态重估（F4）
+        List<Map<String, Object>> mergedLaws = caseProfile.getLawsJson();
         try {
-            caseProfile.setUpdatedAt(LocalDateTime.now());
-            caseMapper.updateById(caseProfile);
+            mergedLaws = mergeLawRefs(caseProfile, userMessage);
+        } catch (Exception e) {
+            log.warn("引用法条落库失败: {}", e.getMessage());
+        }
+
+        // 精准更新 facts/laws/updatedAt，避免整实体回写覆盖 evidence_refs 等并发写入的列
+        final Map<String, Object> factsToSave = mergedFacts;
+        final List<Map<String, Object>> lawsToSave = mergedLaws;
+        try {
+            LambdaUpdateWrapper<CaseProfile> uw = new LambdaUpdateWrapper<CaseProfile>()
+                    .eq(CaseProfile::getCaseId, caseProfile.getCaseId())
+                    .set(CaseProfile::getUpdatedAt, LocalDateTime.now());
+            if (factsToSave != null && !factsToSave.isEmpty()) {
+                uw.set(CaseProfile::getFactsJson, factsToSave, JSON_TYPE_HANDLER);
+            }
+            if (lawsToSave != null) {
+                uw.set(CaseProfile::getLawsJson, lawsToSave, JSON_TYPE_HANDLER);
+            }
+            caseMapper.update(null, uw);
             caseStatusService.reevaluate(caseProfile.getCaseId());
         } catch (Exception e) {
             log.error("案件档案回写/状态重估失败: sessionId={}", sessionId, e);
         }
 
+        // 证据建议（此时已含真实收集状态；缺失项已注入下一轮系统提示词）
         try {
-            AgentState state = new AgentState(caseProfile.getDomainType(), caseProfile.getFactsJson());
-            EvidenceAdvisor.EvidenceAdvice advice = evidenceAdvisor.advise(state);
+            EvidenceAdvisor.EvidenceAdvice advice = evidenceAdvisor.advise(
+                    new AgentState(caseProfile.getDomainType(), factsToSave), collectedEvidenceIds(caseProfile));
             log.info("[AGENT] 会话 {} 证据建议: 必要缺失={}, 增强缺失={}, 预警={}",
                     sessionId, advice.getMissingNecessary().size(),
                     advice.getMissingEnhancing().size(), advice.getEarlyWarnings().size());
@@ -261,15 +343,17 @@ public class ChatService {
 
     /**
      * 将本轮检索到的引用法条去重合并进案件 lawsJson（F3：让"法律意见"有数据可展示）
+     *
+     * @return 合并后的完整法条列表
      */
-    private void mergeLawRefs(CaseProfile caseProfile, String userMessage) {
+    private List<Map<String, Object>> mergeLawRefs(CaseProfile caseProfile, String userMessage) {
+        List<Map<String, Object>> existing = new ArrayList<>(
+                caseProfile.getLawsJson() != null ? caseProfile.getLawsJson() : new ArrayList<>());
         try {
             List<LawStarResponse.ArticleResult> refs = lawService.search(userMessage, "全国");
             if (refs == null || refs.isEmpty()) {
-                return;
+                return existing;
             }
-            List<Map<String, Object>> existing = new ArrayList<>(
-                    caseProfile.getLawsJson() != null ? caseProfile.getLawsJson() : new ArrayList<>());
             Set<String> seen = new HashSet<>();
             for (Map<String, Object> m : existing) {
                 seen.add(m.get("lawTitle") + "|" + m.get("article"));
@@ -290,11 +374,11 @@ public class ChatService {
             while (existing.size() > 20) {
                 existing.remove(0);
             }
-            caseProfile.setLawsJson(existing);
             log.info("会话 {} 引用法条已合并: {} 条", caseProfile.getCaseId(), existing.size());
         } catch (Exception e) {
-            log.warn("引用法条落库失败: {}", e.getMessage());
+            log.warn("引用法条检索失败，保留既有法条: {}", e.getMessage());
         }
+        return existing;
     }
 
     private void saveMessage(Long sessionId, String role, String content) {

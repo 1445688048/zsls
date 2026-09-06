@@ -13,15 +13,18 @@ App({
   /**
    * 幂等的登录就绪 Promise：
    * - 页面首个请求前 await getApp().ensureLogin()，避免登录竞态；
-   * - 登录失败也 resolve（页面正常渲染，由 request 的 401 兜底重登）。
+   * - 隐私未同意时直接返回，不缓存（同意后下一次调用会真正登录）；
+   * - 登录失败也 resolve（页面正常渲染，由 request 的 401 兜底重登），
+   *   但清除缓存以便下次调用重试。
    */
   ensureLogin() {
+    if (!isPrivacyAgreed()) return Promise.resolve(null);
     if (!this._loginReady) {
       this._loginReady = (async () => {
-        if (!isPrivacyAgreed()) return null;
         try {
           return await login();
         } catch (e) {
+          this._loginReady = null;
           console.log("自动登录失败，等待用户操作", e);
           return null;
         }

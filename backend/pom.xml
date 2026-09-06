@@ -21,8 +21,6 @@
         <java.version>21</java.version>
         <spring-ai.version>2.0.1</spring-ai.version>
         <mybatis-plus.version>3.5.17</mybatis-plus.version>
-        <snakeyaml.version>2.2</snakeyaml.version>
-        <caffeine.version>3.1.8</caffeine.version>
     </properties>
     
     <dependencyManagement>
@@ -54,9 +52,9 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-cache</artifactId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
-        
+
         <!-- Spring AI（OpenAI 兼容供应商） -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
@@ -84,20 +82,13 @@
             <scope>runtime</scope>
         </dependency>
         
-        <!-- Cache -->
-        <dependency>
-            <groupId>com.github.ben-manes.caffeine</groupId>
-            <artifactId>caffeine</artifactId>
-            <version>${caffeine.version}</version>
-        </dependency>
-
         <!-- PDF 导出 -->
         <dependency>
             <groupId>com.openhtmltopdf</groupId>
             <artifactId>openhtmltopdf-pdfbox</artifactId>
             <version>1.0.10</version>
         </dependency>
-        
+
         <!-- Utilities -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -107,10 +98,10 @@
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
+        <!-- 插件 yaml 解析（版本由 Spring Boot BOM 托管，勿自行锁定旧版） -->
         <dependency>
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
-            <version>${snakeyaml.version}</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>

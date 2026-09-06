@@ -1,6 +1,6 @@
 // utils/auth.js
-const { setToken, setUser } = require("./storage");
-const { request } = require("./request");
+const { setUser } = require("./storage");
+const { silentLogin } = require("./request");
 
 async function wxLogin() {
   return new Promise((resolve, reject) => {
@@ -19,15 +19,10 @@ async function wxLogin() {
   });
 }
 
+/** 登录：换取 token 并写入本地用户信息（/auth/login 免鉴权，走 silentLogin 而非 request） */
 async function login() {
   try {
-    const code = await wxLogin();
-    const res = await request({
-      url: "/auth/login",
-      method: "POST",
-      data: { code },
-    });
-    setToken(res.token);
+    const res = await silentLogin();
     setUser({ userId: res.userId, openid: res.openid });
     return res;
   } catch (e) {

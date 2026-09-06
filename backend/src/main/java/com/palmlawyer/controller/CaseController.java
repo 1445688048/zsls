@@ -33,9 +33,17 @@ public class CaseController {
     @PostMapping
     public CaseProfile create(@RequestBody Map<String, Object> body) {
         return caseService.create(AuthContext.userId(),
-                (String) body.getOrDefault("domainType", "LABOR"),
-                (String) body.getOrDefault("title", "案件"),
-                (String) body.getOrDefault("description", null));
+                strOrDefault(body.get("domainType"), "LABOR"),
+                strOrDefault(body.get("title"), "案件"),
+                strOrNull(body.get("description")));
+    }
+
+    private String strOrDefault(Object o, String def) {
+        return o == null ? def : String.valueOf(o);
+    }
+
+    private String strOrNull(Object o) {
+        return o == null ? null : String.valueOf(o);
     }
 
     /**
